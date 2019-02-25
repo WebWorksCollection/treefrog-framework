@@ -66,11 +66,15 @@ void TActionContext::execute(THttpRequest &request, int sid)
         const THttpRequestHeader &reqHeader = httpReq->header();
 
         // Access log
+        QByteArray firstLine;
+        firstLine.reserve(200);
+        firstLine += reqHeader.method();
+        firstLine += ' ';
+        firstLine += reqHeader.path();
+        firstLine += QStringLiteral(" HTTP/%1.%2").arg(reqHeader.majorVersion()).arg(reqHeader.minorVersion()).toLatin1();
         accessLogger.setTimestamp(QDateTime::currentDateTime());
-        QByteArray firstLine = reqHeader.method() + ' ' + reqHeader.path();
-        firstLine += QString(" HTTP/%1.%2").arg(reqHeader.majorVersion()).arg(reqHeader.minorVersion()).toLatin1();
         accessLogger.setRequest(firstLine);
-        accessLogger.setRemoteHost( (Tf::appSettings()->value(Tf::ListenPort).toUInt() > 0) ? clientAddress().toString().toLatin1() : QByteArray("(unix)") );
+        accessLogger.setRemoteHost( (Tf::appSettings()->value(Tf::ListenPort).toUInt() > 0) ? clientAddress().toString().toLatin1() : QByteArrayLiteral("(unix)") );
 
         tSystemDebug("method : %s", reqHeader.method().data());
         tSystemDebug("path : %s", reqHeader.path().data());
@@ -188,6 +192,10 @@ void TActionContext::execute(THttpRequest &request, int sid)
                             // Sets the path in the session cookie
                             QString cookiePath = Tf::appSettings()->value(Tf::SessionCookiePath).toString();
                             currController->addCookie(TSession::sessionName(), currController->session().id(), expire, cookiePath, QString(), false, true);
+
+                            // Commits a transaction for session
+                            commitTransactions();
+
                         } else {
                             tSystemError("Failed to store a session");
                         }
@@ -257,8 +265,14 @@ void TActionContext::execute(THttpRequest &request, int sid)
             }
             accessLogger.setResponseBytes(bytes);
 
-            // Session GC
-            TSessionManager::instance().collectGarbage();
+            // Session
+            if (currController->sessionEnabled()) {
+                // Session GC
+                TSessionManager::instance().collectGarbage();
+
+                // Commits a transaction for session
+                commitTransactions();
+            }
 
         } else {
             accessLogger.setStatusCode( Tf::BadRequest );  // Set a default status code
@@ -342,9 +356,9 @@ void TActionContext::execute(THttpRequest &request, int sid)
         tError("Caught StandardException: %s  [%s:%d]", qPrintable(e.message()), qPrintable(e.fileName()), e.lineNumber());
         tSystemError("Caught StandardException: %s  [%s:%d]", qPrintable(e.message()), qPrintable(e.fileName()), e.lineNumber());
         closeHttpSocket();
-    } catch (...) {
-        tError("Caught Exception");
-        tSystemError("Caught Exception");
+    } catch (std::exception &e) {
+        tError("Caught Exception: %s", e.what());
+        tSystemError("Caught Exception: %s", e.what());
         closeHttpSocket();
     }
 

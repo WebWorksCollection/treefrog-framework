@@ -1,8 +1,7 @@
 #ifndef TACTIONCONTROLLER_H
 #define TACTIONCONTROLLER_H
 
-#include <QObject>
-#include <QString>
+#include <QtCore>
 #include <QHostAddress>
 #include <QDomDocument>
 #include <TGlobal>
@@ -13,10 +12,6 @@
 #include <TSession>
 #include <TCookieJar>
 #include <TAccessValidator>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QJsonArray>
-#include <QJsonValue>
 
 class TActionView;
 class TAbstractUser;
@@ -83,6 +78,14 @@ protected:
     bool renderJson(const QVariantMap &map);
     bool renderJson(const QVariantList &list);
     bool renderJson(const QStringList &list);
+#if QT_VERSION >= 0x050c00  // 5.12.0
+    bool renderCbor(const QVariant &variant);
+    bool renderCbor(const QVariantMap &map);
+    bool renderCbor(const QVariantHash &hash);
+    bool renderCbor(const QCborValue &value);
+    bool renderCbor(const QCborMap &map);
+    bool renderCbor(const QCborArray &array);
+#endif
     bool renderErrorResponse(int statusCode);
     void redirect(const QUrl &url, int statusCode = Tf::Found);
     bool sendFile(const QString &filePath, const QByteArray &contentType, const QString &name = QString(), bool autoRemove = false);
